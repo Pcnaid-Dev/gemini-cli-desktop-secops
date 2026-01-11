@@ -887,10 +887,28 @@ fn rocket() -> _ {
         ws_manager,
     };
 
+    // Security: Bind to localhost by default. Use GEMINI_BIND_ADDRESS environment variable to override.
+    // WARNING: Binding to 0.0.0.0 exposes the server to your network without authentication.
+    let bind_address = std::env::var("GEMINI_BIND_ADDRESS")
+        .unwrap_or_else(|_| "127.0.0.1".to_string());
+
+    if bind_address != "127.0.0.1" && bind_address != "localhost" {
+        eprintln!("\n⚠️  ═══════════════════════════════════════════════════════════");
+        eprintln!("⚠️  WARNING: Server binding to {} - accessible from network!", bind_address);
+        eprintln!("⚠️  This exposes your application to unauthorized access.");
+        eprintln!("⚠️  No authentication is currently implemented.");
+        eprintln!("⚠️  Ensure proper firewall rules are in place.");
+        eprintln!("⚠️  ═══════════════════════════════════════════════════════════\n");
+    } else {
+        println!("🔒 Server binding to {} (localhost only)", bind_address);
+        println!("💡 To allow network access, set GEMINI_BIND_ADDRESS=0.0.0.0");
+        println!("⚠️  Note: Network access is not recommended without authentication\n");
+    }
+
     rocket::custom(
         rocket::Config::figment()
             .merge(("port", 1858))
-            .merge(("address", "0.0.0.0")),
+            .merge(("address", bind_address)),
     )
     .manage(app_state)
     .mount("/", routes![index])
