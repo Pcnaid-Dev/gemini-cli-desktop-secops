@@ -892,15 +892,29 @@ fn rocket() -> _ {
     let bind_address = std::env::var("GEMINI_BIND_ADDRESS")
         .unwrap_or_else(|_| "127.0.0.1".to_string());
 
-    if bind_address != "127.0.0.1" && bind_address != "localhost" {
+    // Validate bind address format
+    let validated_address = match bind_address.parse::<std::net::IpAddr>() {
+        Ok(_) => bind_address.clone(),
+        Err(_) => {
+            // Check if it's a valid hostname (basic validation)
+            if bind_address == "localhost" || bind_address.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-') {
+                bind_address.clone()
+            } else {
+                eprintln!("❌ Error: Invalid GEMINI_BIND_ADDRESS '{}'. Using default 127.0.0.1", bind_address);
+                "127.0.0.1".to_string()
+            }
+        }
+    };
+
+    if validated_address != "127.0.0.1" && validated_address != "localhost" {
         eprintln!("\n⚠️  ═══════════════════════════════════════════════════════════");
-        eprintln!("⚠️  WARNING: Server binding to {} - accessible from network!", bind_address);
+        eprintln!("⚠️  WARNING: Server binding to {} - accessible from network!", validated_address);
         eprintln!("⚠️  This exposes your application to unauthorized access.");
         eprintln!("⚠️  No authentication is currently implemented.");
         eprintln!("⚠️  Ensure proper firewall rules are in place.");
         eprintln!("⚠️  ═══════════════════════════════════════════════════════════\n");
     } else {
-        println!("🔒 Server binding to {} (localhost only)", bind_address);
+        println!("🔒 Server binding to {} (localhost only)", validated_address);
         println!("💡 To allow network access, set GEMINI_BIND_ADDRESS=0.0.0.0");
         println!("⚠️  Note: Network access is not recommended without authentication\n");
     }
@@ -908,7 +922,7 @@ fn rocket() -> _ {
     rocket::custom(
         rocket::Config::figment()
             .merge(("port", 1858))
-            .merge(("address", bind_address)),
+            .merge(("address", validated_address)),
     )
     .manage(app_state)
     .mount("/", routes![index])
